@@ -35,27 +35,27 @@ class Line {
 public class Tachistoscope {
     private final static String APPTITLE = "Tachistoscope L1";
     private File textFileToRead;
-    int positionInText;
+    private int positionInText;
+    private int visibilityDuration = 100;
     private ArrayList<Line> lines;
     private final int preferredLineLength = 25;
-    JPanel flashPanel;
-    JLabel flashLabel;
-    JFrame controlWindow;
+    private JPanel flashPanel;
+    private JLabel flashLabel;
+    private JFrame controlWindow;
     private int flashInterval = 700;
     private ActionListener startButtonAction;
     private ActionListener stopButtonAction;
-    private JButton startButton;
-    private JButton stopButton;
-    private JButton resetButton;
+    private ActionListener setVisibilityDurationAction;
     private ActionListener resetButtonAction;
     private ActionListener delayAction;
     private ActionListener loadTextAction;
+    private JButton startButton;
+    private JButton stopButton;
+    private JButton resetButton;
     private ScheduledExecutorService scheduler;
     private JMenuItem setVisibilityDurationMenuItem;
-    JMenuItem setFlashIntervalMenuItem;
-    private int visibilityDuration = 100;
+    private JMenuItem setFlashIntervalMenuItem;
     private JMenuItem loadTextMenuItem;
-    private ActionListener setVisibilityDurationAction;
     private final Dimension preferredDimension = new Dimension(500, 100);
 
     public static void main(String[] args) throws FileNotFoundException {
