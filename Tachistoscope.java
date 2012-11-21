@@ -6,17 +6,15 @@ import java.awt.FontMetrics;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import javax.swing.Timer;
+import javax.swing.*;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Scanner;
-
 import com.apple.eawt.*;
 import java.awt.Image;
+import java.util.concurrent.*;
+import java.net.URL;
 
-
-
-import javax.swing.*;
 
 class Line 
 {
@@ -43,9 +41,7 @@ class Line
 
 public class Tachistoscope {
 
-	
-	
-	
+
 	private final static String APPTITLE = "Tachistoscope L1";
 	private File textFileToRead;
 	int positionInText;
@@ -54,29 +50,35 @@ public class Tachistoscope {
 	JPanel flashPanel;
 	JLabel flashLabel;
 	JFrame controlWindow;
-	private int flashDelay = 700;
+	private int flashInterval = 700;
 	private ActionListener startButtonAction;
 	private ActionListener stopButtonAction;
-	private Timer timer;
+
 	private JButton startButton;
 	private JButton stopButton;
 	private JButton resetButton;
-	private JButton delayButton;
-	private JButton loadTextButton;
+
 	private ActionListener resetButtonAction;
 	private ActionListener delayAction;
 	private ActionListener loadTextAction;
 	private File textForReading;
-	private JButton clipButton;
-	private ActionListener clipButtonAction;
-	private boolean clip = false;
+
+	private ScheduledExecutorService scheduler;
+	private JMenuItem setVisibilityDurationMenuItem;
+	JMenuItem setFlashIntervalMenuItem;
+	private int visibilityDuration = 100;
+	private JMenuItem loadTextMenuItem;
+	private ActionListener setVisibilityDurationAction;
+	private final Dimension preferredDimension= new Dimension(500, 100);
 	
 	
 	public static void main(String[] args) throws FileNotFoundException
 	{
 		System.setProperty("com.apple.mrj.application.apple.menu.about.name", APPTITLE);
+		System.setProperty("apple.laf.useScreenMenuBar", "true");
 		Application application = Application.getApplication();
-		Image image = Toolkit.getDefaultToolkit().getImage("lib/icon.png");
+		URL imageURL = Tachistoscope.class.getResource("resources/icon.png");
+		Image image = Toolkit.getDefaultToolkit().getImage(imageURL);
 		application.setDockIconImage(image);
 		new Tachistoscope();
 	}
@@ -91,39 +93,17 @@ public class Tachistoscope {
 		}
 	}
 	
-/*
+
 	public void displayLine(int lineNum){
 		flashPanel.remove(flashLabel);
-		System.out.println("displaying line " + lines.get(lineNum).text);
 		flashLabel = new JLabel(lines.get(lineNum).text);
 		flashLabel.setFont(new Font("Serif", Font.PLAIN, 24));
 		flashPanel.add(flashLabel);
 		flashPanel.revalidate();
 		controlWindow.repaint();
 	}
-	*/
 	
-	public void displayLine(int lineNum){
-		flashPanel.remove(flashLabel);
-		
-		flashLabel = new JLabel(lines.get(lineNum).text);
-		flashLabel.setFont(new Font("Serif", Font.PLAIN, 24));
-		
-		ActionListener taskPerformer = new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                clearLine();
-            }
-        };
-		
-		
-		Timer clearText = new Timer(500,taskPerformer);
-		clearText.start();
-		flashPanel.add(flashLabel);
-		
-		flashPanel.revalidate();
-		controlWindow.repaint();
-	}
-	
+
 	public void clearLine(){
         flashPanel.remove(flashLabel);
         flashPanel.revalidate();
@@ -215,8 +195,8 @@ public class Tachistoscope {
                 if (len > maxLineLength)
                 	maxLineLength = len;
             }
-            System.out.println("max line length : " + maxLineLength);
-            resize(new Dimension(maxLineLength+20, 100));
+            if (maxLineLength > preferredDimension.width)
+                resize(new Dimension(maxLineLength+20, 100));
             
             positionInText = 0;
             displayLine(0);
@@ -236,43 +216,70 @@ public class Tachistoscope {
 	}
 	
 	public Tachistoscope(){
-
+		
 		controlWindow = new JFrame(APPTITLE);
 		controlWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		JPanel mainPanel = new JPanel();
 		mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.PAGE_AXIS));
 		flashPanel = new JPanel();
 		JPanel controlPanel = new JPanel();
-		loadTextButton = new JButton("load text");
-		
 		startButton = new JButton("start");
 		stopButton = new JButton("stop");
 		resetButton = new JButton("reset");
-		delayButton = new JButton("set delay");
-		clipButton = new JButton("clip");
-		controlPanel.add(loadTextButton);
-		controlPanel.add(startButton);
+        controlPanel.add(startButton);
 		controlPanel.add(stopButton);
 		controlPanel.add(resetButton);
-		controlPanel.add(delayButton);
-		controlPanel.add(clipButton);
+
+
 		
 		mainPanel.add(flashPanel);
 		flashLabel = new JLabel("text will flash here");
 		flashLabel.setFont(new Font("Serif", Font.PLAIN, 24));
 		flashPanel.add(flashLabel);
-		flashPanel.setPreferredSize(new Dimension(500, 100));
+		
+		flashPanel.setPreferredSize(preferredDimension);
 		flashPanel.setMaximumSize(flashPanel.getPreferredSize()); 
 		flashPanel.setMinimumSize(flashPanel.getPreferredSize());
 		mainPanel.add(controlPanel);
 		controlWindow.add(mainPanel);
+		
+		
+		
+		
+		JMenuBar menuBar = new JMenuBar();
+		
+		JMenu fileMenu = new JMenu("File");
+		loadTextMenuItem = new JMenuItem("Load Text");
+		fileMenu.add(loadTextMenuItem);
+		
+		JMenu menu = new JMenu("Customize");
+		menuBar.add(fileMenu);
+		menuBar.add(menu);
+		
+		
+		setFlashIntervalMenuItem = new JMenuItem("set flash interval");
+		setVisibilityDurationMenuItem = new JMenuItem("set visibility duration");
+		menu.add(setFlashIntervalMenuItem);
+		menu.add(setVisibilityDurationMenuItem);
+		
+		
+		controlWindow.setJMenuBar(menuBar);
+		
+		
+		
+		
+		
+		
+		
+		
 		controlWindow.pack();
 
 		
 		controlWindow.setVisible(true);
 		
 		bindLoadTextButton();
-		bindDelayButton();
+
+		bindSetFlashIntervalMenuItem();
 	
 		
 	}
@@ -288,33 +295,96 @@ public class Tachistoscope {
 		
 	}
 	
-	public void unbindDelayButton() {
-		delayButton.removeActionListener(delayAction);
+	public void unbindSetFlashIntervalMenuItem() {
+		setFlashIntervalMenuItem.removeActionListener(delayAction);
+		setVisibilityDurationMenuItem.removeActionListener(setVisibilityDurationAction); 
 	}
 	
-	public void bindDelayButton(){
+	public void bindSetFlashIntervalMenuItem(){
 		delayAction = new ActionListener() {
 			 
             public void actionPerformed(ActionEvent e)
             {
-            	setFlashDelay();
+            	setFlashInterval();
             }
 	            
 	    };
-        delayButton.addActionListener(delayAction); 
+	    setFlashIntervalMenuItem.addActionListener(delayAction); 
+	    
+	    
+		setVisibilityDurationAction = new ActionListener() {
+			 
+            public void actionPerformed(ActionEvent e)
+            {
+            	setVisibilityDuration();
+            }
+	            
+	    };
+	    setVisibilityDurationMenuItem.addActionListener(setVisibilityDurationAction); 
+	    
+	    
+	    
+	    
 	}
 	
-	public void setFlashDelay(){
+	
+	public void setVisibilityDuration(){
+	    JFrame jframe = new JFrame();
+			String s = (String)JOptionPane.showInputDialog(
+			                    jframe,
+			                    "Set the visibility duration in milliseconds.",
+			                    "Set Visibility Duration",
+			                    JOptionPane.PLAIN_MESSAGE,
+			                    null,
+			                    null,
+			                    this.visibilityDuration);
+
+			if ((s != null) && (s.length() > 0)) {
+				try{
+					int visibilityDuration = Integer.parseInt(s);
+			
+			        if (visibilityDuration <= 0)
+			        	throw new IllegalArgumentException("Input must be a positive integer.");
+			        else if (visibilityDuration > flashInterval)
+			        	throw new IllegalArgumentException("Input must be less than or equal to the flash interval.");
+			        else
+			        	this.visibilityDuration = visibilityDuration;
+			        
+				}
+				catch(NumberFormatException e)
+				{
+					JFrame errorDialog = new JFrame();
+					JOptionPane.showMessageDialog(errorDialog,
+					    "Input must be a positive integer.  No change was made.");
+				}
+				catch(IllegalArgumentException e)
+				{
+					JFrame errorDialog = new JFrame();
+					JOptionPane.showMessageDialog(errorDialog,
+					    e.getMessage() + " No change was made.");
+				}
+			} else {
+				JFrame errorDialog = new JFrame();
+				JOptionPane.showMessageDialog(errorDialog,
+				    "No change was made.");
+				
+			}
+		
+		
+	}
+	
+	
+	public void setFlashInterval(){
         JFrame jframe = new JFrame();
 		//Object[] possibilities = {"200","300","400","500","600","700","800","900","1000"};
 		String s = (String)JOptionPane.showInputDialog(
 		                    jframe,
 		                    "Set the duration in milliseconds of each flash.",
-		                    APPTITLE,
+		                    "Set Flash Interval",
 		                    JOptionPane.PLAIN_MESSAGE,
 		                    null,
 		                    null,
-		                    this.flashDelay);
+		                    this.flashInterval);
 
 		if ((s != null) && (s.length() > 0)) {
 
@@ -325,7 +395,7 @@ public class Tachistoscope {
 		        if (flashDelay <= 0)
 		        	throw new IllegalArgumentException();
 		        else
-		        	this.flashDelay = flashDelay;
+		        	this.flashInterval = flashDelay;
 		        
 			}
 			catch(NumberFormatException e)
@@ -340,12 +410,16 @@ public class Tachistoscope {
 				JOptionPane.showMessageDialog(errorDialog,
 				    "Input must be a positive integer.  No change was made.");
 			}
-			
-			
 		} else {
-			flashDelay = 550;
+			JFrame errorDialog = new JFrame();
+			JOptionPane.showMessageDialog(errorDialog,
+			    "No change was made.");
 		}
 	}
+	
+	
+	
+	
 	
 	public void bindStartButton(){
 		startButtonAction = new ActionListener() {
@@ -373,12 +447,12 @@ public class Tachistoscope {
 	            
 	    };
 		
-		loadTextButton.addActionListener(loadTextAction);    
+	    loadTextMenuItem.addActionListener(loadTextAction);    
 		
 	}
 	
 	public void unbindLoadTextButton() {
-		loadTextButton.removeActionListener(loadTextAction);
+		loadTextMenuItem.removeActionListener(loadTextAction);
 	}
 	
 	public void unbindStartButton(){
@@ -409,51 +483,33 @@ public class Tachistoscope {
 	public void startFlash(){
 		unbindResetButton();
 		unbindStartButton();
-		unbindDelayButton();
+		unbindSetFlashIntervalMenuItem();
 		unbindLoadTextButton();
 		bindStopButton();
-		if (timer != null)
-		    timer.stop();
-		class FlashAction implements ActionListener
-	    {
-		    private Tachistoscope tachistoscope;
-			
-			public void actionPerformed(ActionEvent e) {
-				tachistoscope.flash();
-	        }
-			
-			public FlashAction(Tachistoscope tachistoscope){
-				this.tachistoscope = tachistoscope;
-			}
-		}
-		FlashAction flashAction= new FlashAction(this);
-		timer = new Timer(flashDelay,flashAction);
-		timer.setRepeats(true);
 		
-		ActionListener clearAction = new ActionListener() {
 		
-			public void actionPerformed(ActionEvent e) {
-				clearLine();
-	        }
+		final Runnable beeper = new Runnable() {
+           public void run() { flash(); }
         };
-		Timer clearTimer = new Timer(flashDelay,clearAction);
-		clearTimer.setInitialDelay(flashDelay+100);
-		
-		
-		timer.start();
-		clearTimer.start();
-		
-		
-		
+        
+        
+        final Runnable clearLineRunnable = new Runnable(){
+        	public void run() { clearLine();}
+        };
+        
+        scheduler = Executors.newScheduledThreadPool(2);
+        scheduler.scheduleAtFixedRate(beeper, (long)50, (long)this.flashInterval, TimeUnit.MILLISECONDS);
+        if (visibilityDuration < flashInterval)
+            scheduler.scheduleAtFixedRate(clearLineRunnable, (long)(visibilityDuration +50), (long)this.flashInterval, TimeUnit.MILLISECONDS);
 	}
 	
 	public void stopFlash(){
 		unbindStopButton();
-		
-		timer.stop();
+		scheduler.shutdown();
+		//timer.stop();
 		bindStartButton();
 		bindResetButton();
-		bindDelayButton();
+		bindSetFlashIntervalMenuItem();
 		bindLoadTextButton();
 	}
 	
